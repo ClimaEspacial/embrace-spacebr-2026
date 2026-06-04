@@ -335,9 +335,9 @@ function handleFormSubmit(event) {
   submitRegistration(session.id, formData)
     .then((data) => {
       console.log('Resposta do backend:', data);
+
       setFormLoading(false);
       if (data.success) {
-        // Decrementa vaga localmente para feedback imediato
         if (typeof state.availability[session.id] === 'number') {
           state.availability[session.id] = Math.max(0, state.availability[session.id] - 1);
         }

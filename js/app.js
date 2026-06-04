@@ -38,8 +38,16 @@ const views = ['view-home', 'view-form', 'view-confirmation', 'view-full-error']
 function showView(id) {
   views.forEach((v) => {
     const el = document.getElementById(v);
-    if (el) el.hidden = v !== id;
+    if (el) {
+      el.hidden = v !== id;
+      if (v !== id) {
+        el.setAttribute('aria-hidden', 'true');
+      } else {
+        el.removeAttribute('aria-hidden');
+      }
+    }
   });
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -257,11 +265,23 @@ async function submitRegistration(sessionId, formData) {
 // Confirmação
 // ─────────────────────────────────────────────
 function showConfirmation(session) {
+  if (!session) {
+    showView('view-full-error');
+    const errorEl = document.getElementById('full-error-message');
+    if (errorEl) {
+      errorEl.textContent = 'Não foi possível carregar os dados da sessão confirmada.';
+    }
+    return;
+  }
+
   const topic = getTopic(session.topicId);
-  document.getElementById('conf-topic').textContent = topic ? `${topic.emoji} ${topic.name}` : session.topicId;
-  document.getElementById('conf-time').textContent = session.time;
-  document.getElementById('conf-day').textContent = session.day;
-  document.getElementById('conf-location').textContent = CONFIG.event.locationDetail;
+  document.getElementById('conf-topic').textContent =
+    topic ? `${topic.emoji} ${topic.name}` : session.topicId || '';
+
+  document.getElementById('conf-time').textContent = session.time || '';
+  document.getElementById('conf-day').textContent = session.day || '';
+  document.getElementById('conf-location').textContent = CONFIG.event.locationDetail || '';
+
   showView('view-confirmation');
 }
 
@@ -303,7 +323,11 @@ function handleFormSubmit(event) {
 
   const formData = { name, institution, email, interests };
   const session = state.selectedSession;
-  if (!session) return;
+  if (!session) {
+    setFormLoading(false);
+    setFormError('Sessão não encontrada. Volte e selecione uma sessão novamente.');
+    return;
+  }
 
   setFormError('');
   setFormLoading(true);
@@ -347,15 +371,15 @@ async function init() {
   const topicParam = params.get('tema');
   const sessionParam = params.get('sessao');
 
-  // Carrega disponibilidade
   const loadingEl = document.getElementById('sessions-loading');
   if (loadingEl) loadingEl.hidden = false;
 
   await loadAvailability();
 
+  if (loadingEl) loadingEl.hidden = true;
+
   maybeShowDemoBanner();
 
-  // Deep link: sessão específica (QR de sessão)
   if (sessionParam) {
     const session = getSession(sessionParam);
     if (session && (state.availability[session.id] ?? session.spots) > 0) {
@@ -364,7 +388,6 @@ async function init() {
     }
   }
 
-  // Deep link: tema específico (QR de tema)
   if (topicParam && getTopic(topicParam)) {
     state.currentFilter = topicParam;
   }
@@ -373,7 +396,6 @@ async function init() {
   renderFilterBar(state.currentFilter);
   renderSessions(topicParam || null);
 }
-
 // ─────────────────────────────────────────────
 // Event listeners
 // ─────────────────────────────────────────────

@@ -26,7 +26,7 @@ const CONFIG = {
     name: 'SpaceBR Show 2026',
     location: 'Estande da AEB',
     locationDetail: 'Pavilhão Central – SpaceBR Show 2026',
-    organization: 'AEB',
+    organization: 'EMBRACE-INPE',
     talkDuration: '15 minutos',
   },
 

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#060c1d">
+  <meta name="description"
+    content="Space Weather Talks – Sessões de 15 minutos com pesquisadores de clima espacial no estande da AEB na SpaceBR Show 2026. Reserve sua vaga!">
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="Space Weather Talks | AEB – SpaceBR Show 2026">
+  <meta property="og:description" content="Sessões de 15 min com pesquisadores. Escolha um tema e reserve sua vaga no estande da AEB.">
+  <meta property="og:type"        content="website">
+
+  <title>Space Weather Talks | AEB – SpaceBR Show 2026</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-logos">
+        <span class="header-org">AEB</span>
+        <span class="header-separator">·</span>
+        <span class="header-event">SpaceBR Show 2026</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Banner: modo demo ──────────────────────────────────── -->
+  <div id="demo-banner" class="demo-banner" role="status" hidden>
+    ⚠️ Modo demonstração — vagas simuladas. Configure o Apps Script para produção.
+  </div>
+
+  <!-- ── Conteúdo principal ─────────────────────────────────── -->
+  <main id="app">
+
+    <!-- VIEW 1: Página inicial com grade de sessões -->
+    <section id="view-home" class="view">
+
+      <div class="hero">
+        <h1 class="hero-title">Space Weather<br>Talks</h1>
+        <p class="hero-subtitle">
+          Sessões de 15 minutos com pesquisadores de clima espacial.
+          Escolha um tema e reserve sua vaga.
+        </p>
+        <p class="hero-location">📍 Estande da AEB</p>
+      </div>
+
+      <div class="sessions-container">
+        <!-- Botões de filtro por dia gerados pelo JS -->
+        <nav class="filter-bar" id="filter-bar" aria-label="Filtrar por dia"></nav>
+
+        <!-- Spinner de carregamento -->
+        <div id="sessions-loading" class="loading-indicator" aria-live="polite" aria-label="Carregando sessões">
+          <div class="spinner"></div>
+          <p>Verificando disponibilidade…</p>
+        </div>
+
+        <!-- Lista de sessões gerada pelo JS -->
+        <div id="sessions-list" aria-live="polite" aria-label="Lista de sessões"></div>
+      </div>
+
+    </section><!-- /#view-home -->
+
+
+    <!-- VIEW 2: Formulário de inscrição -->
+    <section id="view-form" class="view" hidden aria-labelledby="form-topic-name">
+
+      <button class="btn-back" id="btn-back-home" type="button" aria-label="Voltar à lista de sessões">
+        ← Voltar
+      </button>
+
+      <!-- Cabeçalho da sessão selecionada -->
+      <div class="session-header">
+        <span class="session-emoji" id="form-topic-emoji" aria-hidden="true"></span>
+        <div>
+          <h2 class="session-name" id="form-topic-name"></h2>
+          <p  class="session-meta"  id="form-session-meta"></p>
+        </div>
+      </div>
+
+      <form id="registration-form" novalidate>
+
+        <div class="form-group">
+          <label for="field-name">Nome completo *</label>
+          <input
+            type="text"
+            id="field-name"
+            name="name"
+            required
+            placeholder="Seu nome"
+            autocomplete="name"
+            inputmode="text"
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="field-institution">Instituição</label>
+          <input
+            type="text"
+            id="field-institution"
+            name="institution"
+            placeholder="Empresa, universidade ou órgão"
+            autocomplete="organization"
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="field-email">Email *</label>
+          <input
+            type="email"
+            id="field-email"
+            name="email"
+            required
+            placeholder="seu@email.com"
+            autocomplete="email"
+            inputmode="email"
+          >
+        </div>
+
+        <!-- Preferências de comunicação -->
+        <fieldset class="interests-fieldset">
+          <legend>Quero receber:</legend>
+
+          <label class="checkbox-label">
+            <input type="checkbox" name="interests" value="noticias">
+            Notícias sobre clima espacial
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" name="interests" value="estagio">
+            Oportunidades de estágio
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" name="interests" value="cursos">
+            Cursos e treinamentos
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" name="interests" value="eventos">
+            Eventos da AEB
+          </label>
+
+          <label class="checkbox-label">
+            <input type="checkbox" name="interests" value="parcerias">
+            Parcerias institucionais
+          </label>
+        </fieldset>
+
+        <!-- Mensagem de erro inline -->
+        <div id="form-error" class="error-message" role="alert" hidden></div>
+
+        <button type="submit" class="btn-primary" id="btn-submit">
+          <span class="btn-text">🚀 Reservar Minha Vaga</span>
+          <span class="btn-loading" hidden aria-hidden="true">
+            <span class="spinner-small"></span>&nbsp;Enviando…
+          </span>
+        </button>
+
+      </form>
+
+    </section><!-- /#view-form -->
+
+
+    <!-- VIEW 3: Confirmação -->
+    <section id="view-confirmation" class="view" hidden aria-labelledby="conf-heading">
+
+      <div class="confirmation-card">
+        <div class="confirmation-icon" aria-hidden="true">✅</div>
+        <h2 id="conf-heading">Inscrição Confirmada!</h2>
+        <p class="confirmation-subtitle">Nos vemos em breve no estande da AEB.</p>
+
+        <dl class="confirmation-details">
+          <dt>Tema</dt>
+          <dd id="conf-topic"></dd>
+
+          <dt>Horário</dt>
+          <dd id="conf-time"></dd>
+
+          <dt>Dia</dt>
+          <dd id="conf-day"></dd>
+
+          <dt>Local</dt>
+          <dd id="conf-location"></dd>
+        </dl>
+
+        <button type="button" class="btn-secondary" id="btn-new-registration">
+          Ver outras sessões
+        </button>
+      </div>
+
+    </section><!-- /#view-confirmation -->
+
+
+    <!-- VIEW 4: Erro (página inteira) -->
+    <section id="view-full-error" class="view" hidden aria-labelledby="full-error-title">
+
+      <div class="error-card">
+        <div class="error-icon" aria-hidden="true">⚠️</div>
+        <h2 id="full-error-title">Ops!</h2>
+        <p id="full-error-message"></p>
+        <button type="button" class="btn-secondary" id="btn-retry">
+          ← Voltar às sessões
+        </button>
+      </div>
+
+    </section><!-- /#view-full-error -->
+
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <p>
+      <strong>EMBRACE</strong> — Estudo e Monitoramento Brasileiro do Clima Espacial
+      <br>
+      <span class="footer-event">SpaceBR Show 2026 · Estande da AEB</span>
+    </p>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

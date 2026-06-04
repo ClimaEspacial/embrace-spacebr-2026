@@ -200,6 +200,14 @@ function registerVisitor(payload) {
     institution || '', // E: Instituição
     interestsStr,      // F: Interesses
   ]);
+  const sessionInfo = getSessionDetails(sessionId);
+  if (sessionInfo) {
+    try {
+      sendConfirmationEmail(email, name, sessionInfo);
+    } catch (err) {
+      Logger.log('Erro ao enviar email de confirmação: ' + err.message);
+    }
+  }
 
   Logger.log('Inscrição registrada: ' + email + ' → ' + sessionId);
   return { success: true, message: 'Inscrição realizada com sucesso!' };
@@ -267,4 +275,35 @@ function setupSpreadsheet() {
 
   Logger.log('✅ Planilha configurada com sucesso!');
   SpreadsheetApp.getUi().alert('Planilha configurada! As abas "Sessões" e "Inscrições" foram criadas.');
+}
+
+const sessionInfo = getSessionDetails(sessionId);
+if (sessionInfo) {
+  try {
+    sendConfirmationEmail(email, name, sessionInfo);
+  } catch (err) {
+    Logger.log('Erro ao enviar email de confirmação: ' + err.message);
+  }
+}
+
+function sendConfirmationEmail(email, name, sessionInfo) {
+  const subject = 'Confirmação — Space Weather Talks';
+
+  const body = [
+    `Olá, ${name}!`,
+    '',
+    'Sua inscrição foi confirmada.',
+    '',
+    `Tema: ${sessionInfo.topicName}`,
+    `Horário: ${sessionInfo.time}`,
+    `Dia: ${sessionInfo.day}`,
+    'Local: Espaço do EMBRACE - INPE no estande da AEB',
+    '',
+    'Nos vemos em breve!',
+    '',
+    'EMBRACE - INPE',
+    'SpaceBR Show 2026',
+  ].join('\n');
+
+  MailApp.sendEmail(email, subject, body);
 }

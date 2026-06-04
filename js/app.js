@@ -50,9 +50,9 @@ async function loadAvailability() {
   state.isMockMode = !CONFIG.APPS_SCRIPT_URL;
 
   if (state.isMockMode) {
-    // Modo demo: gera vagas aleatórias para visualização
+    // Modo demo: gera vagas aleatórias para visualização (inclui 0 = esgotado)
     CONFIG.sessions.forEach((s) => {
-      state.availability[s.id] = Math.floor(Math.random() * (s.spots - 1)) + 2;
+      state.availability[s.id] = Math.floor(Math.random() * (s.spots + 1));
     });
     return;
   }
@@ -312,7 +312,7 @@ function handleFormSubmit(event) {
     .then((data) => {
       setFormLoading(false);
       if (data.success) {
-        // Descrementa vaga localmente para feedback imediato
+        // Decrementa vaga localmente para feedback imediato
         if (typeof state.availability[session.id] === 'number') {
           state.availability[session.id] = Math.max(0, state.availability[session.id] - 1);
         }

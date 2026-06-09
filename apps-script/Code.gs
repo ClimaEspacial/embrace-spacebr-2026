@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 
 /** Use apenas o ID da planilha, não a URL inteira */
-const SPREADSHEET_ID = '';
+const SPREADSHEET_ID = '1xjGvAG_gaUCDR_sPrHZTNHKMkZhW_OHJu9_Xa2Vf7Vs';
 
 const SHEET_REGISTRATIONS = 'Inscrições';
 const SHEET_SESSIONS = 'Sessões';
@@ -227,7 +227,7 @@ function registerVisitor(payload) {
   }
 
   Logger.log('Inscrição registrada: ' + email + ' → ' + sessionId);
-  return { success: true, message: 'Inscrição realizada com sucesso!' };
+  return { success: true, message: 'Inscrição realizada com sucesso!', emailVersion: 'v2-email-on' };;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -240,7 +240,6 @@ function sendConfirmationEmail(email, name, sessionInfo) {
   }
 
   let formattedTime = sessionInfo.time || '';
-
   if (formattedTime instanceof Date) {
     formattedTime = Utilities.formatDate(
       formattedTime,
@@ -249,7 +248,7 @@ function sendConfirmationEmail(email, name, sessionInfo) {
     );
   }
 
-  const subject = 'Confirmação — Space Weather Talks';
+  const subject = 'Confirmação de inscrição — Space Weather Talks';
 
   const body = [
     `Olá, ${name}!`,
@@ -260,6 +259,8 @@ function sendConfirmationEmail(email, name, sessionInfo) {
     `Horário: ${formattedTime}`,
     `Dia: ${sessionInfo.day || ''}`,
     'Local: Espaço do EMBRACE - INPE no estande da AEB',
+    '',
+    'Se necessário, chegue com alguns minutos de antecedência.',
     '',
     'Nos vemos em breve!',
     '',
@@ -311,7 +312,7 @@ function setupSpreadsheet() {
       '10:30',
       '16/06',
       'Monitoramento de clima espacial durante lançamentos de foguetes',
-      10
+      15
     ],
     [
       'session-2',
@@ -319,7 +320,7 @@ function setupSpreadsheet() {
       '14:30',
       '16/06',
       'Os perigos causados à aviação durante eventos extremos de clima espacial',
-      10
+      15
     ],
     [
       'session-3',
@@ -327,7 +328,7 @@ function setupSpreadsheet() {
       '10:30',
       '17/06',
       'Quando o Sol ameaça a rede elétrica: entendendo as Correntes Geomagneticamente Induzidas (GICs)',
-      10
+      15
     ],
     [
       'session-4',
@@ -335,7 +336,7 @@ function setupSpreadsheet() {
       '14:30',
       '17/06',
       'Do espaço para o campo: como o clima espacial afeta GPS, drones e agricultura de precisão',
-      10
+      15
     ],
   ];
 

@@ -17,7 +17,7 @@ const CONFIG = {
   //    Após implantar o Web App (ver README), cole a URL aqui.
   //    Exemplo: 'https://script.google.com/macros/s/AKfyc.../exec'
   // ------------------------------------------------------------------
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzh5PzLBzJQOfA7N408VI4DWTsfcEDzVir3aDDgvb8b_ZC66QWlsQWzIbZWwLhAaw6T/exec',
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz04y3_F3B03sQAc02RBfBCTfs5yUuHF0o1KsAVoSdoQ8Oy5aSJxSEFs76E-Ikv9syO/exec',
 
   // ------------------------------------------------------------------
   // 2. INFORMAÇÕES DO EVENTO

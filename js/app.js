@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 
 /** Use apenas o ID da planilha, não a URL inteira */
-const SPREADSHEET_ID = '';
+const SPREADSHEET_ID = '1xjGvAG_gaUCDR_sPrHZTNHKMkZhW_OHJu9_Xa2Vf7Vs';
 
 const SHEET_REGISTRATIONS = 'Inscrições';
 const SHEET_SESSIONS = 'Sessões';

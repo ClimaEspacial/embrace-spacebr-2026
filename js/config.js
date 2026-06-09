@@ -27,7 +27,7 @@ const CONFIG = {
     location: 'Estande da AEB',
     locationDetail: 'Pavilhão Central – SpaceBR Show 2026',
     organization: 'EMBRACE-INPE',
-    talkDuration: '15 minutos',
+    talkDuration: '30 minutos',
   },
 
   // ------------------------------------------------------------------
@@ -40,52 +40,36 @@ const CONFIG = {
   // ------------------------------------------------------------------
   topics: [
     {
-      id: 'tempestades-solares',
-      name: 'Tempestades Solares',
-      question: 'O Sol pode derrubar satélites?',
-      emoji: '☀️',
+      id: 'lancamentos-foguetes',
+      name: 'Monitoramento de clima espacial durante lançamentos de foguetes',
+      question: 'Como o clima espacial é monitorado durante lançamentos de foguetes?',
+      emoji: '🚀',
       description:
-        'Entenda como as erupções solares afetam a Terra e os sistemas tecnológicos.',
+        'Entenda como condições de clima espacial são acompanhadas para apoiar operações de lançamento.',
     },
     {
-      id: 'gps-ionosfera',
-      name: 'GPS e Ionosfera',
-      question: 'Por que o GPS erra durante tempestades solares?',
-      emoji: '📡',
+      id: 'aviacao-eventos-extremos',
+      name: 'Os perigos causados à aviação durante eventos extremos de clima espacial',
+      question: 'Eventos extremos de clima espacial podem afetar a aviação?',
+      emoji: '✈️',
       description:
-        'Descubra como o clima espacial interfere no posicionamento e na navegação.',
+        'Saiba como eventos extremos podem impactar rotas, comunicações e segurança na aviação.',
     },
     {
-      id: 'satellites',
-      name: 'Satélites e Clima Espacial',
-      question: 'Lançamentos espaciais dependem do clima espacial?',
-      emoji: '🛰️',
-      description:
-        'Saiba como o ambiente espacial impacta a operação e a vida útil dos satélites.',
-    },
-    {
-      id: 'gics',
-      name: 'GICs e Redes Elétricas',
-      question: 'O Brasil corre risco de GICs?',
+      id: 'gics-rede-eletrica',
+      name: 'Quando o Sol ameaça a rede elétrica: entendendo as Correntes Geomagneticamente Induzidas (GICs)',
+      question: 'Como o Sol pode afetar a rede elétrica por meio das GICs?',
       emoji: '⚡',
       description:
-        'Correntes Induzidas Geomagneticamente podem afetar transformadores e redes de energia.',
+        'Veja como correntes geomagneticamente induzidas podem afetar transformadores e sistemas de energia.',
     },
     {
-      id: 'inteligencia-artificial',
-      name: 'Inteligência Artificial',
-      question: 'IA consegue prever tempestades geomagnéticas?',
-      emoji: '🤖',
+      id: 'gps-drones-agricultura',
+      name: 'Do espaço para o campo: como o clima espacial afeta GPS, drones e agricultura de precisão',
+      question: 'O clima espacial pode afetar GPS, drones e agricultura de precisão?',
+      emoji: '🌾',
       description:
-        'Como machine learning e IA estão revolucionando a previsão do clima espacial.',
-    },
-    {
-      id: 'clima-brasil',
-      name: 'Clima Espacial no Brasil',
-      question: 'Por que a Anomalia Magnética do Atlântico Sul é importante?',
-      emoji: '🇧🇷',
-      description:
-        'O Brasil ocupa uma posição única no globo para o estudo do clima espacial.',
+        'Descubra como perturbações no ambiente espacial impactam posicionamento, drones e operações no campo.',
     },
   ],
 
@@ -103,23 +87,9 @@ const CONFIG = {
   //    https://<seu-site>/?tema=<topicId>
   // ------------------------------------------------------------------
   sessions: [
-    // --- Dia 1 ---
-    { id: 'session-1',  topicId: 'tempestades-solares',     time: '10:00', day: 'Dia 1', spots: 10 },
-    { id: 'session-2',  topicId: 'gps-ionosfera',           time: '10:30', day: 'Dia 1', spots: 10 },
-    { id: 'session-3',  topicId: 'satellites',              time: '11:00', day: 'Dia 1', spots: 10 },
-    { id: 'session-4',  topicId: 'inteligencia-artificial', time: '11:30', day: 'Dia 1', spots: 10 },
-    { id: 'session-5',  topicId: 'gics',                    time: '14:00', day: 'Dia 1', spots: 10 },
-    { id: 'session-6',  topicId: 'clima-brasil',            time: '14:30', day: 'Dia 1', spots: 10 },
-    { id: 'session-7',  topicId: 'tempestades-solares',     time: '15:00', day: 'Dia 1', spots: 10 },
-    { id: 'session-8',  topicId: 'gps-ionosfera',           time: '15:30', day: 'Dia 1', spots: 10 },
-    // --- Dia 2 ---
-    { id: 'session-9',  topicId: 'satellites',              time: '10:00', day: 'Dia 2', spots: 10 },
-    { id: 'session-10', topicId: 'tempestades-solares',     time: '10:30', day: 'Dia 2', spots: 10 },
-    { id: 'session-11', topicId: 'gics',                    time: '11:00', day: 'Dia 2', spots: 10 },
-    { id: 'session-12', topicId: 'inteligencia-artificial', time: '11:30', day: 'Dia 2', spots: 10 },
-    { id: 'session-13', topicId: 'clima-brasil',            time: '14:00', day: 'Dia 2', spots: 10 },
-    { id: 'session-14', topicId: 'gps-ionosfera',           time: '14:30', day: 'Dia 2', spots: 10 },
-    { id: 'session-15', topicId: 'tempestades-solares',     time: '15:00', day: 'Dia 2', spots: 10 },
-    { id: 'session-16', topicId: 'satellites',              time: '15:30', day: 'Dia 2', spots: 10 },
+    { id: 'session-1', topicId: 'lancamentos-foguetes',    time: '10:30', day: '16/06', spots: 15 },
+    { id: 'session-2', topicId: 'aviacao-eventos-extremos', time: '14:30', day: '16/06', spots: 15 },
+    { id: 'session-3', topicId: 'gics-rede-eletrica',       time: '10:30', day: '17/06', spots: 15 },
+    { id: 'session-4', topicId: 'gps-drones-agricultura',   time: '14:30', day: '17/06', spots: 15 },
   ],
 };

@@ -1,439 +1,357 @@
 /**
- * app.js — Lógica principal do Space Weather Talks
- *
- * Fluxo:
- *  1. Inicialização: lê parâmetros de URL para deep links de QR code
- *  2. Carrega disponibilidade de vagas (Apps Script ou modo demo)
- *  3. Exibe grade de sessões com filtro por dia
- *  4. Permite clicar numa sessão → formulário de inscrição
- *  5. Envia dados ao Apps Script → exibe confirmação ou erro
+ * Code.gs — Google Apps Script para Space Weather Talks
+ * EMBRACE - INPE · SpaceBR Show 2026
  */
 
-// ─────────────────────────────────────────────
-// Estado global
-// ─────────────────────────────────────────────
-const state = {
-  selectedSession: null,   // objeto de sessão selecionada
-  availability: {},        // { sessionId: vagasDisponíveis }
-  currentFilter: 'all',    // filtro ativo: 'all' | 'Dia 1' | 'Dia 2' | <topicId>
-  isMockMode: false,       // true quando APPS_SCRIPT_URL está vazio
-};
+// ─────────────────────────────────────────────────────────────
+// CONFIGURAÇÃO
+// ─────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────
-// Helpers de lookup
-// ─────────────────────────────────────────────
-function getTopic(topicId) {
-  return CONFIG.topics.find((t) => t.id === topicId) || null;
-}
+/** Use apenas o ID da planilha, não a URL inteira */
+const SPREADSHEET_ID = '';
 
-function getSession(sessionId) {
-  return CONFIG.sessions.find((s) => s.id === sessionId) || null;
-}
+const SHEET_REGISTRATIONS = 'Inscrições';
+const SHEET_SESSIONS = 'Sessões';
 
-// ─────────────────────────────────────────────
-// Navegação entre views
-// ─────────────────────────────────────────────
-const views = ['view-home', 'view-form', 'view-confirmation', 'view-full-error'];
+// ─────────────────────────────────────────────────────────────
+// HANDLERS HTTP
+// ─────────────────────────────────────────────────────────────
 
-function showView(id) {
-  views.forEach((v) => {
-    const el = document.getElementById(v);
-    if (el) {
-      el.hidden = v !== id;
-      if (v !== id) {
-        el.setAttribute('aria-hidden', 'true');
-      } else {
-        el.removeAttribute('aria-hidden');
-      }
-    }
-  });
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// ─────────────────────────────────────────────
-// Carregamento de disponibilidade
-// ─────────────────────────────────────────────
-async function loadAvailability() {
-  state.isMockMode = !CONFIG.APPS_SCRIPT_URL;
-
-  if (state.isMockMode) {
-    // Modo demo: gera vagas aleatórias para visualização (inclui 0 = esgotado)
-    CONFIG.sessions.forEach((s) => {
-      state.availability[s.id] = Math.floor(Math.random() * (s.spots + 1));
-    });
-    return;
-  }
-
+function doGet(e) {
   try {
-    const url = `${CONFIG.APPS_SCRIPT_URL}?action=availability`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const action = (e && e.parameter && e.parameter.action) || '';
 
-    if (data.success && data.availability) {
-      state.availability = data.availability;
-    } else {
-      throw new Error(data.error || 'Resposta inesperada do servidor.');
+    if (action === 'availability') {
+      const availability = getAvailability();
+      return jsonResponse({ success: true, availability });
     }
+
+    if (action === 'sessions') {
+      const sessions = getSessionsFromSheet();
+      return jsonResponse({ success: true, sessions });
+    }
+
+    return jsonResponse({
+      success: false,
+      error: 'Ação não reconhecida. Use ?action=availability.',
+    });
   } catch (err) {
-    console.warn('[SpaceWeather] Disponibilidade em tempo real indisponível — usando capacidade máxima.', err);
-    // Fallback: assume todas as vagas disponíveis
-    CONFIG.sessions.forEach((s) => {
-      state.availability[s.id] = s.spots;
-    });
+    Logger.log('doGet error: ' + err.message);
+    return jsonResponse({ success: false, error: 'Erro interno: ' + err.message });
   }
 }
 
-// ─────────────────────────────────────────────
-// Renderização de cards de sessão
-// ─────────────────────────────────────────────
-function renderSessions(filterTopicId) {
-  const listEl = document.getElementById('sessions-list');
-  const loadingEl = document.getElementById('sessions-loading');
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ success: false, error: 'Corpo da requisição vazio.' });
+    }
 
-  loadingEl.hidden = true;
+    const payload = JSON.parse(e.postData.contents);
 
-  // Determina filtro ativo
-  if (filterTopicId) {
-    state.currentFilter = filterTopicId;
+    if (payload.action === 'register') {
+      const result = registerVisitor(payload);
+      return jsonResponse(result);
+    }
+
+    return jsonResponse({ success: false, error: 'Ação não reconhecida.' });
+  } catch (err) {
+    Logger.log('doPost error: ' + err.message);
+    return jsonResponse({ success: false, error: 'Dados inválidos: ' + err.message });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// LÓGICA DE NEGÓCIO
+// ─────────────────────────────────────────────────────────────
+
+function getAvailability() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const regSheet = ss.getSheetByName(SHEET_REGISTRATIONS);
+  const sessSheet = ss.getSheetByName(SHEET_SESSIONS);
+
+  if (!regSheet || !sessSheet) {
+    throw new Error('Abas não encontradas. Execute setupSpreadsheet() primeiro.');
   }
 
-  let sessions = CONFIG.sessions;
+  const regData = regSheet.getDataRange().getValues();
+  const counts = {};
 
-  if (state.currentFilter !== 'all') {
-    // Filtro por dia (ex.: 'Dia 1')
-    if (CONFIG.sessions.some((s) => s.day === state.currentFilter)) {
-      sessions = sessions.filter((s) => s.day === state.currentFilter);
-    } else {
-      // Filtro por tema
-      sessions = sessions.filter((s) => s.topicId === state.currentFilter);
+  for (let i = 1; i < regData.length; i++) {
+    const sessionId = regData[i][1];
+    if (sessionId) {
+      counts[sessionId] = (counts[sessionId] || 0) + 1;
     }
   }
 
-  if (sessions.length === 0) {
-    listEl.innerHTML = '<p class="empty-message">Nenhuma sessão encontrada para este filtro.</p>';
-    return;
+  const sessData = sessSheet.getDataRange().getValues();
+  const availability = {};
+
+  for (let i = 1; i < sessData.length; i++) {
+    const sessionId = sessData[i][0];
+    const capacity = Number(sessData[i][5]) || 10;
+    const registered = counts[sessionId] || 0;
+    availability[sessionId] = Math.max(0, capacity - registered);
   }
 
-  // Agrupa por dia
-  const byDay = {};
-  sessions.forEach((s) => {
-    if (!byDay[s.day]) byDay[s.day] = [];
-    byDay[s.day].push(s);
-  });
+  return availability;
+}
 
-  let html = '';
-  Object.keys(byDay).forEach((day) => {
-    html += `<h2 class="day-heading">${day}</h2><div class="sessions-row">`;
-    byDay[day].forEach((session) => {
-      const topic = getTopic(session.topicId);
-      if (!topic) return;
+function getSessionsFromSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sessSheet = ss.getSheetByName(SHEET_SESSIONS);
 
-      const avail = state.availability[session.id] ?? session.spots;
-      const isFull = avail <= 0;
-      const isLow = !isFull && avail <= 3;
+  if (!sessSheet) throw new Error('Aba Sessões não encontrada.');
 
-      const availClass = isFull ? 'badge-full' : isLow ? 'badge-low' : 'badge-ok';
-      const availText = isFull ? 'Esgotado' : `${avail} vaga${avail !== 1 ? 's' : ''}`;
+  const data = sessSheet.getDataRange().getValues();
+  const sessions = [];
 
-      html += `
-        <button
-          class="session-card${isFull ? ' session-card--full' : ''}"
-          data-session-id="${session.id}"
-          ${isFull ? 'disabled aria-disabled="true"' : ''}
-          aria-label="${topic.emoji} ${topic.name} — ${session.time} — ${availText}"
-        >
-          <span class="card-emoji">${topic.emoji}</span>
-          <div class="card-body">
-            <span class="card-time">${session.time}</span>
-            <span class="card-name">${topic.name}</span>
-            <span class="card-question">${topic.question}</span>
-          </div>
-          <span class="badge ${availClass}">${availText}</span>
-        </button>`;
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+
+    sessions.push({
+      id: row[0],
+      topicId: row[1],
+      time: row[2],
+      day: row[3],
+      name: row[4],
+      spots: Number(row[5]) || 10,
     });
-    html += '</div>';
-  });
-
-  listEl.innerHTML = html;
-
-  // Eventos nos cards
-  listEl.querySelectorAll('.session-card:not([disabled])').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const session = getSession(btn.dataset.sessionId);
-      if (session) openForm(session);
-    });
-  });
-}
-
-// ─────────────────────────────────────────────
-// Filtro de dias/temas
-// ─────────────────────────────────────────────
-function renderFilterBar(activeFilter) {
-  const bar = document.getElementById('filter-bar');
-  if (!bar) return;
-
-  // Coleta dias únicos presentes na grade
-  const days = [...new Set(CONFIG.sessions.map((s) => s.day))];
-
-  let html = `<button class="filter-btn${activeFilter === 'all' ? ' active' : ''}" data-filter="all">Todos</button>`;
-  days.forEach((day) => {
-    html += `<button class="filter-btn${activeFilter === day ? ' active' : ''}" data-filter="${day}">${day}</button>`;
-  });
-
-  bar.innerHTML = html;
-
-  bar.querySelectorAll('.filter-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.currentFilter = btn.dataset.filter;
-      renderFilterBar(state.currentFilter);
-      renderSessions();
-    });
-  });
-}
-
-// ─────────────────────────────────────────────
-// Formulário de inscrição
-// ─────────────────────────────────────────────
-function openForm(session) {
-  state.selectedSession = session;
-  const topic = getTopic(session.topicId);
-  if (!topic) return;
-
-  document.getElementById('form-topic-emoji').textContent = topic.emoji;
-  document.getElementById('form-topic-name').textContent = topic.name;
-  document.getElementById('form-session-meta').textContent =
-    `${session.time} · ${session.day} · ${CONFIG.event.location}`;
-
-  // Reseta o formulário
-  document.getElementById('registration-form').reset();
-  setFormError('');
-  setFormLoading(false);
-
-  showView('view-form');
-}
-
-function setFormError(message) {
-  const el = document.getElementById('form-error');
-  if (!el) return;
-  el.textContent = message;
-  el.hidden = !message;
-}
-
-function setFormLoading(loading) {
-  const btn = document.getElementById('btn-submit');
-  if (!btn) return;
-  const text = btn.querySelector('.btn-text');
-  const loadingEl = btn.querySelector('.btn-loading');
-  btn.disabled = loading;
-  if (text) text.hidden = loading;
-  if (loadingEl) loadingEl.hidden = !loading;
-}
-
-// ─────────────────────────────────────────────
-// Envio ao Apps Script
-// ─────────────────────────────────────────────
-async function submitRegistration(sessionId, formData) {
-  if (state.isMockMode) {
-    await new Promise((r) => setTimeout(r, 1400));
-    return { success: true };
   }
 
-  const payload = {
-    action: 'register',
-    sessionId,
-    name: formData.name,
-    institution: formData.institution,
-    email: formData.email,
-    interests: formData.interests,
-  };
-
-  // Usamos 'text/plain' para evitar pre-flight CORS em Apps Script
-  const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-    body: JSON.stringify(payload),
-    redirect: 'follow',
-  });
-
-  if (!res.ok) throw new Error(`Erro de servidor: ${res.status}`);
-  return await res.json();
+  return sessions;
 }
 
-// ─────────────────────────────────────────────
-// Confirmação
-// ─────────────────────────────────────────────
-function showConfirmation(session) {
-  if (!session) {
-    showView('view-full-error');
-    const errorEl = document.getElementById('full-error-message');
-    if (errorEl) {
-      errorEl.textContent = 'Não foi possível carregar os dados da sessão confirmada.';
+function getSessionDetails(sessionId) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sessSheet = ss.getSheetByName(SHEET_SESSIONS);
+  if (!sessSheet) throw new Error('Aba Sessões não encontrada.');
+
+  const data = sessSheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[0] === sessionId) {
+      return {
+        id: row[0],
+        topicId: row[1],
+        time: row[2],
+        day: row[3],
+        topicName: row[4],
+        spots: Number(row[5]) || 10,
+      };
     }
-    return;
   }
 
-  const topic = getTopic(session.topicId);
-  document.getElementById('conf-topic').textContent =
-    topic ? `${topic.emoji} ${topic.name}` : session.topicId || '';
-
-  document.getElementById('conf-time').textContent = session.time || '';
-  document.getElementById('conf-day').textContent = session.day || '';
-  document.getElementById('conf-location').textContent = CONFIG.event.locationDetail || '';
-
-  showView('view-confirmation');
+  return null;
 }
 
-// ─────────────────────────────────────────────
-// Handler do formulário
-// ─────────────────────────────────────────────
-function handleFormSubmit(event) {
-  event.preventDefault();
+function registerVisitor(payload) {
+  const { sessionId, name, institution, email, interests } = payload;
 
-  const form = event.target;
-
-  // Validação básica
-  const name = form.elements['name'].value.trim();
-  const institution = form.elements['institution'].value.trim();
-  const email = form.elements['email'].value.trim();
-
-  if (!name) {
-    setFormError('Por favor, informe seu nome.');
-    form.elements['name'].focus();
-    return;
-  }
-
-  if (!email) {
-    setFormError('Por favor, informe seu email.');
-    form.elements['email'].focus();
-    return;
+  if (!sessionId || !name || !email) {
+    return {
+      success: false,
+      error: 'Campos obrigatórios ausentes (sessionId, name, email).',
+    };
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    setFormError('Email inválido. Verifique e tente novamente.');
-    form.elements['email'].focus();
-    return;
+    return { success: false, error: 'Endereço de email inválido.' };
   }
 
-  // Coleta interesses marcados
-  const interests = Array.from(form.querySelectorAll('input[name="interests"]:checked'))
-    .map((cb) => cb.value);
-
-  const formData = { name, institution, email, interests };
-  const session = state.selectedSession;
-  if (!session) {
-    setFormLoading(false);
-    setFormError('Sessão não encontrada. Volte e selecione uma sessão novamente.');
-    return;
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const regSheet = ss.getSheetByName(SHEET_REGISTRATIONS);
+  if (!regSheet) {
+    return { success: false, error: 'Aba de inscrições não encontrada.' };
   }
 
-  setFormError('');
-  setFormLoading(true);
+  const availability = getAvailability();
 
-  submitRegistration(session.id, formData)
-    .then((data) => {
-      console.log('Resposta do backend:', data);
+  if (!(sessionId in availability)) {
+    return { success: false, error: 'Sessão não encontrada.' };
+  }
 
-      setFormLoading(false);
-      if (data.success) {
-        if (typeof state.availability[session.id] === 'number') {
-          state.availability[session.id] = Math.max(0, state.availability[session.id] - 1);
-        }
-        showConfirmation(session);
-      } else {
-        setFormError(data.error || 'Não foi possível completar a inscrição. Tente novamente.');
-      }
-    })
-    .catch((err) => {
-      setFormLoading(false);
-      console.error('[SpaceWeather] Erro ao enviar inscrição:', err);
-      setFormError(
-        'Erro de conexão. Verifique sua internet e tente novamente.',
-      );
-    });
-}
+  if (availability[sessionId] <= 0) {
+    return {
+      success: false,
+      error: 'Desculpe, não há mais vagas disponíveis nesta sessão.',
+    };
+  }
 
-// ─────────────────────────────────────────────
-// Banner de modo demo
-// ─────────────────────────────────────────────
-function maybeShowDemoBanner() {
-  if (!state.isMockMode) return;
-  const banner = document.getElementById('demo-banner');
-  if (banner) banner.hidden = false;
-}
-
-// ─────────────────────────────────────────────
-// Inicialização
-// ─────────────────────────────────────────────
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  const topicParam = params.get('tema');
-  const sessionParam = params.get('sessao');
-
-  const loadingEl = document.getElementById('sessions-loading');
-  if (loadingEl) loadingEl.hidden = false;
-
-  await loadAvailability();
-
-  if (loadingEl) loadingEl.hidden = true;
-
-  maybeShowDemoBanner();
-
-  if (sessionParam) {
-    const session = getSession(sessionParam);
-    if (session && (state.availability[session.id] ?? session.spots) > 0) {
-      openForm(session);
-      return;
+  const regData = regSheet.getDataRange().getValues();
+  for (let i = 1; i < regData.length; i++) {
+    if (
+      String(regData[i][2]).toLowerCase() === String(email).toLowerCase() &&
+      regData[i][1] === sessionId
+    ) {
+      return {
+        success: false,
+        error: 'Este email já está inscrito nesta sessão.',
+      };
     }
   }
 
-  if (topicParam && getTopic(topicParam)) {
-    state.currentFilter = topicParam;
+  const timestamp = new Date().toISOString();
+  const interestsStr = Array.isArray(interests)
+    ? interests.join(', ')
+    : String(interests || '');
+
+  regSheet.appendRow([
+    timestamp,
+    sessionId,
+    email,
+    name,
+    institution || '',
+    interestsStr,
+  ]);
+
+  const sessionInfo = getSessionDetails(sessionId);
+  Logger.log('sessionId recebido: ' + sessionId);
+  Logger.log('email recebido: ' + email);
+  Logger.log('name recebido: ' + name);
+  Logger.log('sessionInfo encontrado: ' + JSON.stringify(sessionInfo));
+
+  if (sessionInfo) {
+    try {
+      Logger.log('Tentando enviar email para: ' + email);
+      Logger.log('Quota restante: ' + MailApp.getRemainingDailyQuota());
+      sendConfirmationEmail(email, name, sessionInfo);
+      Logger.log('Email enviado com sucesso para: ' + email);
+    } catch (err) {
+      Logger.log('Erro ao enviar email de confirmação: ' + err.message);
+    }
+  } else {
+    Logger.log('Nenhuma sessão encontrada para sessionId: ' + sessionId);
   }
 
-  showView('view-home');
-  renderFilterBar(state.currentFilter);
-  renderSessions(topicParam || null);
+  Logger.log('Inscrição registrada: ' + email + ' → ' + sessionId);
+  return { success: true, message: 'Inscrição realizada com sucesso!', emailVersion: 'v2-email-on' };;
 }
-// ─────────────────────────────────────────────
-// Event listeners
-// ─────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  // Formulário
-  const form = document.getElementById('registration-form');
-  if (form) form.addEventListener('submit', handleFormSubmit);
 
-  // Botão voltar (formulário → home)
-  const btnBack = document.getElementById('btn-back-home');
-  if (btnBack) {
-    btnBack.addEventListener('click', () => {
-      showView('view-home');
-      renderFilterBar(state.currentFilter);
-      renderSessions();
-    });
+// ─────────────────────────────────────────────────────────────
+// EMAIL
+// ─────────────────────────────────────────────────────────────
+
+function sendConfirmationEmail(email, name, sessionInfo) {
+  if (!sessionInfo) {
+    throw new Error('sessionInfo não foi informado para sendConfirmationEmail.');
   }
 
-  // Botão "reservar outra" (confirmação → home)
-  const btnNew = document.getElementById('btn-new-registration');
-  if (btnNew) {
-    btnNew.addEventListener('click', () => {
-      showView('view-home');
-      renderFilterBar(state.currentFilter);
-      renderSessions();
-    });
+  let formattedTime = sessionInfo.time || '';
+  if (formattedTime instanceof Date) {
+    formattedTime = Utilities.formatDate(
+      formattedTime,
+      Session.getScriptTimeZone(),
+      'HH:mm'
+    );
   }
 
-  // Botão voltar (erro → home)
-  const btnRetry = document.getElementById('btn-retry');
-  if (btnRetry) {
-    btnRetry.addEventListener('click', () => {
-      showView('view-home');
-      renderFilterBar(state.currentFilter);
-      renderSessions();
-    });
-  }
+  const subject = 'Confirmação de inscrição — Space Weather Talks';
 
-  init();
-});
+  const body = [
+    `Olá, ${name}!`,
+    '',
+    'Sua inscrição foi confirmada.',
+    '',
+    `Tema: ${sessionInfo.topicName || ''}`,
+    `Horário: ${formattedTime}`,
+    `Dia: ${sessionInfo.day || ''}`,
+    'Local: Espaço do EMBRACE - INPE no estande da AEB',
+    '',
+    'Se necessário, chegue com alguns minutos de antecedência.',
+    '',
+    'Nos vemos em breve!',
+    '',
+    'EMBRACE - INPE',
+    'SpaceBR Show 2026',
+  ].join('\n');
+
+  MailApp.sendEmail(email, subject, body);
+}
+
+function testSendEmail() {
+  MailApp.sendEmail(
+    'email',
+    'Teste — Space Weather Talks',
+    'Se você recebeu este email, o envio está funcionando.'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// UTILITÁRIOS
+// ─────────────────────────────────────────────────────────────
+
+function jsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ─────────────────────────────────────────────────────────────
+// SETUP INICIAL DA PLANILHA
+// ─────────────────────────────────────────────────────────────
+
+function setupSpreadsheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  let sessSheet = ss.getSheetByName(SHEET_SESSIONS);
+  if (!sessSheet) sessSheet = ss.insertSheet(SHEET_SESSIONS);
+  sessSheet.clearContents();
+
+  const sessHeaders = ['ID', 'Tema ID', 'Horário', 'Dia', 'Nome do Tema', 'Vagas'];
+  sessSheet.getRange(1, 1, 1, sessHeaders.length)
+    .setValues([sessHeaders])
+    .setFontWeight('bold');
+
+  const sessions = [
+    ['session-1', 'tempestades-solares', '10:00', 'Dia 1', 'Tempestades Solares', 10],
+    ['session-2', 'gps-ionosfera', '10:30', 'Dia 1', 'GPS e Ionosfera', 10],
+    ['session-3', 'satellites', '11:00', 'Dia 1', 'Satélites e Clima Espacial', 10],
+    ['session-4', 'inteligencia-artificial', '11:30', 'Dia 1', 'Inteligência Artificial', 10],
+    ['session-5', 'gics', '14:00', 'Dia 1', 'GICs e Redes Elétricas', 10],
+    ['session-6', 'clima-brasil', '14:30', 'Dia 1', 'Clima Espacial no Brasil', 10],
+    ['session-7', 'tempestades-solares', '15:00', 'Dia 1', 'Tempestades Solares', 10],
+    ['session-8', 'gps-ionosfera', '15:30', 'Dia 1', 'GPS e Ionosfera', 10],
+    ['session-9', 'satellites', '10:00', 'Dia 2', 'Satélites e Clima Espacial', 10],
+    ['session-10', 'tempestades-solares', '10:30', 'Dia 2', 'Tempestades Solares', 10],
+    ['session-11', 'gics', '11:00', 'Dia 2', 'GICs e Redes Elétricas', 10],
+    ['session-12', 'inteligencia-artificial', '11:30', 'Dia 2', 'Inteligência Artificial', 10],
+    ['session-13', 'clima-brasil', '14:00', 'Dia 2', 'Clima Espacial no Brasil', 10],
+    ['session-14', 'gps-ionosfera', '14:30', 'Dia 2', 'GPS e Ionosfera', 10],
+    ['session-15', 'tempestades-solares', '15:00', 'Dia 2', 'Tempestades Solares', 10],
+    ['session-16', 'satellites', '15:30', 'Dia 2', 'Satélites e Clima Espacial', 10],
+  ];
+
+  sessSheet.getRange(2, 1, sessions.length, 6).setValues(sessions);
+
+  let regSheet = ss.getSheetByName(SHEET_REGISTRATIONS);
+  if (!regSheet) regSheet = ss.insertSheet(SHEET_REGISTRATIONS);
+  regSheet.clearContents();
+
+  const regHeaders = ['Timestamp', 'Session ID', 'Email', 'Nome', 'Instituição', 'Interesses'];
+  regSheet.getRange(1, 1, 1, regHeaders.length)
+    .setValues([regHeaders])
+    .setFontWeight('bold');
+
+  Logger.log('✅ Planilha configurada com sucesso! As abas "Sessões" e "Inscrições" foram criadas.');
+}
+
+function testSessionLookup() {
+  const sessionInfo = getSessionDetails('session-1');
+  Logger.log(JSON.stringify(sessionInfo));
+}
+
+function testRegisterMock() {
+  const result = registerVisitor({
+    action: 'register',
+    sessionId: 'session-1',
+    name: 'Teste Email',
+    institution: 'INPE',
+    email: 'jpmarchezi+teste2@gmail.com',
+    interests: ['Cursos e treinamentos']
+  });
+
+  Logger.log(JSON.stringify(result));
+}

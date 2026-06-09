@@ -103,8 +103,10 @@ Toda a configuração do evento está em **`js/config.js`**:
 
 ```javascript
 sessions: [
-  { id: 'session-1', topicId: 'tempestades-solares', time: '10:00', day: 'Dia 1', spots: 15 },
-  // ...
+  { id: 'session-1', topicId: 'lancamentos-foguetes',    time: '10:30', day: '16/06', spots: 15 },
+  { id: 'session-2', topicId: 'aviacao-eventos-extremos', time: '14:30', day: '16/06', spots: 15 },
+  { id: 'session-3', topicId: 'gics-rede-eletrica',       time: '10:30', day: '17/06', spots: 15 },
+  { id: 'session-4', topicId: 'gps-drones-agricultura',   time: '14:30', day: '17/06', spots: 15 },
 ],
 ```
 
@@ -140,12 +142,10 @@ abrem direto o formulário de uma sessão.
 ### Por tema (mostra todas as sessões do tema)
 
 ```
-https://climaespacial.github.io/embrace-spacebr-2026/?tema=tempestades-solares
-https://climaespacial.github.io/embrace-spacebr-2026/?tema=gps-ionosfera
-https://climaespacial.github.io/embrace-spacebr-2026/?tema=satellites
-https://climaespacial.github.io/embrace-spacebr-2026/?tema=gics
-https://climaespacial.github.io/embrace-spacebr-2026/?tema=inteligencia-artificial
-https://climaespacial.github.io/embrace-spacebr-2026/?tema=clima-brasil
+https://climaespacial.github.io/embrace-spacebr-2026/?tema=lancamentos-foguetes
+https://climaespacial.github.io/embrace-spacebr-2026/?tema=aviacao-eventos-extremos
+https://climaespacial.github.io/embrace-spacebr-2026/?tema=gics-rede-eletrica
+https://climaespacial.github.io/embrace-spacebr-2026/?tema=gps-drones-agricultura
 ```
 
 ### Por sessão específica (abre direto o formulário)
@@ -153,6 +153,8 @@ https://climaespacial.github.io/embrace-spacebr-2026/?tema=clima-brasil
 ```
 https://climaespacial.github.io/embrace-spacebr-2026/?sessao=session-1
 https://climaespacial.github.io/embrace-spacebr-2026/?sessao=session-2
+https://climaespacial.github.io/embrace-spacebr-2026/?sessao=session-3
+https://climaespacial.github.io/embrace-spacebr-2026/?sessao=session-4
 ```
 
 ### Gerar os QR codes
@@ -164,12 +166,12 @@ Use qualquer gerador online ou de linha de comando. Exemplo com `qrencode` (Linu
 brew install qrencode
 
 # Gerar um QR por tema:
-qrencode -o qr-tempestades-solares.png \
-  "https://climaespacial.github.io/embrace-spacebr-2026/?tema=tempestades-solares"
+qrencode -o qr-lancamentos-foguetes.png \
+  "https://climaespacial.github.io/embrace-spacebr-2026/?tema=lancamentos-foguetes"
 
 # Gerar todos os QRs de tema de uma vez:
 BASE="https://climaespacial.github.io/embrace-spacebr-2026"
-for tema in tempestades-solares gps-ionosfera satellites gics inteligencia-artificial clima-brasil; do
+for tema in lancamentos-foguetes aviacao-eventos-extremos gics-rede-eletrica gps-drones-agricultura; do
   qrencode -o "qr-${tema}.png" "${BASE}/?tema=${tema}"
 done
 ```
@@ -211,11 +213,12 @@ Isso permite testar o fluxo completo antes de configurar o backend.
 
 ### Aba "Sessões"
 
-| A: ID       | B: Tema ID            | C: Horário | D: Dia  | E: Nome do Tema      | F: Vagas |
-|-------------|-----------------------|------------|---------|----------------------|----------|
-| session-1   | tempestades-solares   | 10:00      | Dia 1   | Tempestades Solares  | 10       |
-| session-2   | gps-ionosfera         | 10:30      | Dia 1   | GPS e Ionosfera      | 10       |
-| …           | …                     | …          | …       | …                    | …        |
+| A: ID       | B: Tema ID                  | C: Horário | D: Dia   | E: Nome do Tema                                                                | F: Vagas |
+|-------------|-----------------------------|------------|----------|--------------------------------------------------------------------------------|----------|
+| session-1   | lancamentos-foguetes        | 10:30      | 16/06    | Monitoramento de clima espacial durante lançamentos de foguetes                | 15       |
+| session-2   | aviacao-eventos-extremos    | 14:30      | 16/06    | Os perigos causados à aviação durante eventos extremos de clima espacial       | 15       |
+| session-3   | gics-rede-eletrica          | 10:30      | 17/06    | Quando o Sol ameaça a rede elétrica: entendendo as GICs                        | 15       |
+| session-4   | gps-drones-agricultura      | 14:30      | 17/06    | Do espaço para o campo: como o clima espacial afeta GPS, drones e agricultura  | 15       |
 
 ### Aba "Inscrições"
 

@@ -306,22 +306,38 @@ function setupSpreadsheet() {
     .setFontWeight('bold');
 
   const sessions = [
-    ['session-1', 'tempestades-solares', '10:00', 'Dia 1', 'Tempestades Solares', 10],
-    ['session-2', 'gps-ionosfera', '10:30', 'Dia 1', 'GPS e Ionosfera', 10],
-    ['session-3', 'satellites', '11:00', 'Dia 1', 'Satélites e Clima Espacial', 10],
-    ['session-4', 'inteligencia-artificial', '11:30', 'Dia 1', 'Inteligência Artificial', 10],
-    ['session-5', 'gics', '14:00', 'Dia 1', 'GICs e Redes Elétricas', 10],
-    ['session-6', 'clima-brasil', '14:30', 'Dia 1', 'Clima Espacial no Brasil', 10],
-    ['session-7', 'tempestades-solares', '15:00', 'Dia 1', 'Tempestades Solares', 10],
-    ['session-8', 'gps-ionosfera', '15:30', 'Dia 1', 'GPS e Ionosfera', 10],
-    ['session-9', 'satellites', '10:00', 'Dia 2', 'Satélites e Clima Espacial', 10],
-    ['session-10', 'tempestades-solares', '10:30', 'Dia 2', 'Tempestades Solares', 10],
-    ['session-11', 'gics', '11:00', 'Dia 2', 'GICs e Redes Elétricas', 10],
-    ['session-12', 'inteligencia-artificial', '11:30', 'Dia 2', 'Inteligência Artificial', 10],
-    ['session-13', 'clima-brasil', '14:00', 'Dia 2', 'Clima Espacial no Brasil', 10],
-    ['session-14', 'gps-ionosfera', '14:30', 'Dia 2', 'GPS e Ionosfera', 10],
-    ['session-15', 'tempestades-solares', '15:00', 'Dia 2', 'Tempestades Solares', 10],
-    ['session-16', 'satellites', '15:30', 'Dia 2', 'Satélites e Clima Espacial', 10],
+    [
+      'session-1',
+      'lancamentos-foguetes',
+      '10:30',
+      '16/06',
+      'Monitoramento de clima espacial durante lançamentos de foguetes',
+      15
+    ],
+    [
+      'session-2',
+      'aviacao-eventos-extremos',
+      '14:30',
+      '16/06',
+      'Os perigos causados à aviação durante eventos extremos de clima espacial',
+      15
+    ],
+    [
+      'session-3',
+      'gics-rede-eletrica',
+      '10:30',
+      '17/06',
+      'Quando o Sol ameaça a rede elétrica: entendendo as Correntes Geomagneticamente Induzidas (GICs)',
+      15
+    ],
+    [
+      'session-4',
+      'gps-drones-agricultura',
+      '14:30',
+      '17/06',
+      'Do espaço para o campo: como o clima espacial afeta GPS, drones e agricultura de precisão',
+      15
+    ],
   ];
 
   sessSheet.getRange(2, 1, sessions.length, 6).setValues(sessions);

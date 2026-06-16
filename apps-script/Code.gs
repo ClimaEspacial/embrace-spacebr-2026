@@ -309,7 +309,7 @@ function setupSpreadsheet() {
     [
       'session-1',
       'lancamentos-foguetes',
-      '10:30',
+      '10:00',
       '16/06',
       'Monitoramento de clima espacial durante lançamentos de foguetes',
       15
@@ -317,7 +317,7 @@ function setupSpreadsheet() {
     [
       'session-2',
       'aviacao-eventos-extremos',
-      '14:30',
+      '14:00',
       '16/06',
       'Os perigos causados à aviação durante eventos extremos de clima espacial',
       15
@@ -325,7 +325,7 @@ function setupSpreadsheet() {
     [
       'session-3',
       'gics-rede-eletrica',
-      '10:30',
+      '10:00',
       '17/06',
       'Quando o Sol ameaça a rede elétrica: entendendo as Correntes Geomagneticamente Induzidas (GICs)',
       15
@@ -333,7 +333,7 @@ function setupSpreadsheet() {
     [
       'session-4',
       'gps-drones-agricultura',
-      '14:30',
+      '14:00',
       '17/06',
       'Do espaço para o campo: como o clima espacial afeta GPS, drones e agricultura de precisão',
       15

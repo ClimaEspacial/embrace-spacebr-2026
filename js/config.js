@@ -87,9 +87,9 @@ const CONFIG = {
   //    https://<seu-site>/?tema=<topicId>
   // ------------------------------------------------------------------
   sessions: [
-    { id: 'session-1', topicId: 'lancamentos-foguetes',    time: '10:30', day: '16/06', spots: 15 },
-    { id: 'session-2', topicId: 'aviacao-eventos-extremos', time: '14:30', day: '16/06', spots: 15 },
-    { id: 'session-3', topicId: 'gics-rede-eletrica',       time: '10:30', day: '17/06', spots: 15 },
-    { id: 'session-4', topicId: 'gps-drones-agricultura',   time: '14:30', day: '17/06', spots: 15 },
+    { id: 'session-1', topicId: 'lancamentos-foguetes',    time: '10:00', day: '16/06', spots: 15 },
+    { id: 'session-2', topicId: 'aviacao-eventos-extremos', time: '14:00', day: '16/06', spots: 15 },
+    { id: 'session-3', topicId: 'gics-rede-eletrica',       time: '10:00', day: '17/06', spots: 15 },
+    { id: 'session-4', topicId: 'gps-drones-agricultura',   time: '14:00', day: '17/06', spots: 15 },
   ],
 };

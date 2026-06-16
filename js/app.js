@@ -1,365 +1,373 @@
 /**
- * app.js — Space Weather Talks SPA
- * EMBRACE-INPE · SpaceBR Show 2026
- *
- * Source of truth for session/topic definitions: js/config.js (CONFIG).
- * Live spot counts are fetched from the Apps Script web app (?action=availability).
- * When CONFIG.APPS_SCRIPT_URL is empty the page runs in demo mode (simulated data).
+ * Code.gs — Google Apps Script para Space Weather Talks
+ * EMBRACE - INPE · SpaceBR Show 2026
  */
 
-(function () {
-  'use strict';
+// ─────────────────────────────────────────────────────────────
+// CONFIGURAÇÃO
+// ─────────────────────────────────────────────────────────────
 
-  // ─── DOM refs ────────────────────────────────────────────────
-  const $ = id => document.getElementById(id);
+/** Use apenas o ID da planilha, não a URL inteira */
+const SPREADSHEET_ID = '1xjGvAG_gaUCDR_sPrHZTNHKMkZhW_OHJu9_Xa2Vf7Vs';
 
-  const views = {
-    home:         $('view-home'),
-    form:         $('view-form'),
-    confirmation: $('view-confirmation'),
-    fullError:    $('view-full-error'),
-  };
+const SHEET_REGISTRATIONS = 'Inscrições';
+const SHEET_SESSIONS = 'Sessões';
 
-  const demoBanner      = $('demo-banner');
-  const filterBar       = $('filter-bar');
-  const sessionsLoading = $('sessions-loading');
-  const sessionsList    = $('sessions-list');
+// ─────────────────────────────────────────────────────────────
+// HANDLERS HTTP
+// ─────────────────────────────────────────────────────────────
 
-  // form view
-  const formTopicEmoji   = $('form-topic-emoji');
-  const formTopicName    = $('form-topic-name');
-  const formSessionMeta  = $('form-session-meta');
-  const registrationForm = $('registration-form');
-  const formError        = $('form-error');
-  const btnSubmit        = $('btn-submit');
-  const btnBackHome      = $('btn-back-home');
+function doGet(e) {
+  try {
+    const action = (e && e.parameter && e.parameter.action) || '';
 
-  // confirmation view
-  const confTopic    = $('conf-topic');
-  const confTime     = $('conf-time');
-  const confDay      = $('conf-day');
-  const confLocation = $('conf-location');
-  const btnNewReg    = $('btn-new-registration');
+    if (action === 'availability') {
+      const availability = getAvailability();
+      return jsonResponse({ success: true, availability });
+    }
 
-  // full-page error view
-  const fullErrorMsg = $('full-error-message');
-  const btnRetry     = $('btn-retry');
+    if (action === 'sessions') {
+      const sessions = getSessionsFromSheet();
+      return jsonResponse({ success: true, sessions });
+    }
 
-  // ─── Constants ───────────────────────────────────────────────
-  const DEMO_SUBMIT_DELAY_MS = 1400;
-
-  // ─── State ───────────────────────────────────────────────────
-  const DEMO = !CONFIG.APPS_SCRIPT_URL;
-  let availability    = {};   // { sessionId: spotsRemaining }
-  let selectedSession = null; // session object currently shown in form
-  let activeDay       = null; // day filter currently active (null = show all)
-
-  // ─── Helpers ─────────────────────────────────────────────────
-  function topicById(id) {
-    return CONFIG.topics.find(t => t.id === id) || null;
-  }
-
-  function showView(name) {
-    Object.entries(views).forEach(([key, el]) => {
-      el.hidden = (key !== name);
+    return jsonResponse({
+      success: false,
+      error: 'Ação não reconhecida. Use ?action=availability.',
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    Logger.log('doGet error: ' + err.message);
+    return jsonResponse({ success: false, error: 'Erro interno: ' + err.message });
   }
+}
 
-  function showFormError(msg) {
-    formError.textContent = msg;
-    formError.hidden = false;
-  }
-
-  function hideFormError() {
-    formError.textContent = '';
-    formError.hidden = true;
-  }
-
-  function setSubmitLoading(on) {
-    btnSubmit.querySelector('.btn-text').hidden    =  on;
-    btnSubmit.querySelector('.btn-loading').hidden = !on;
-    btnSubmit.disabled = on;
-  }
-
-  // ─── Demo helpers ────────────────────────────────────────────
-  function buildDemoAvailability() {
-    const result = {};
-    CONFIG.sessions.forEach(s => {
-      result[s.id] = Math.floor(Math.random() * (s.spots + 1));
-    });
-    return result;
-  }
-
-  // ─── Availability badge ───────────────────────────────────────
-  function badgeFor(spots) {
-    if (spots <= 0) return { cls: 'badge badge-full', label: 'Esgotado' };
-    if (spots <= 3) return { cls: 'badge badge-low',  label: `${spots} vagas` };
-    return               { cls: 'badge badge-ok',   label: `${spots} vagas` };
-  }
-
-  // ─── Session card ─────────────────────────────────────────────
-  function createSessionCard(session, topic, spots) {
-    const isFull     = spots <= 0;
-    const { cls, label } = badgeFor(spots);
-
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'session-card' + (isFull ? ' session-card--full' : '');
-    if (isFull) card.disabled = true;
-
-    card.innerHTML = `
-      <span class="card-emoji" aria-hidden="true">${topic.emoji}</span>
-      <div class="card-body">
-        <span class="card-time">${session.time} · ${session.day}</span>
-        <span class="card-name">${topic.name}</span>
-        <span class="card-question">${topic.question}</span>
-      </div>
-      <span class="${cls}" aria-label="${label}">${label}</span>
-    `;
-
-    if (!isFull) {
-      card.addEventListener('click', () => openForm(session, topic, spots));
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ success: false, error: 'Corpo da requisição vazio.' });
     }
 
-    return card;
-  }
+    const payload = JSON.parse(e.postData.contents);
 
-  // ─── Filter bar ──────────────────────────────────────────────
-  function renderFilterBar(days) {
-    filterBar.innerHTML = '';
-
-    function makeBtn(label, day) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'filter-btn' + (activeDay === day ? ' active' : '');
-      btn.textContent = label;
-      btn.addEventListener('click', () => {
-        activeDay = day;
-        renderSessions();
-      });
-      return btn;
+    if (payload.action === 'register') {
+      const result = registerVisitor(payload);
+      return jsonResponse(result);
     }
 
-    filterBar.appendChild(makeBtn('Todos', null));
-    days.forEach(day => filterBar.appendChild(makeBtn(day, day)));
+    return jsonResponse({ success: false, error: 'Ação não reconhecida.' });
+  } catch (err) {
+    Logger.log('doPost error: ' + err.message);
+    return jsonResponse({ success: false, error: 'Dados inválidos: ' + err.message });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// LÓGICA DE NEGÓCIO
+// ─────────────────────────────────────────────────────────────
+
+function getAvailability() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const regSheet = ss.getSheetByName(SHEET_REGISTRATIONS);
+  const sessSheet = ss.getSheetByName(SHEET_SESSIONS);
+
+  if (!regSheet || !sessSheet) {
+    throw new Error('Abas não encontradas. Execute setupSpreadsheet() primeiro.');
   }
 
-  // ─── Render sessions ─────────────────────────────────────────
-  function renderSessions() {
-    sessionsList.innerHTML = '';
+  const regData = regSheet.getDataRange().getValues();
+  const counts = {};
 
-    const sessions = CONFIG.sessions;
-    const days = [...new Set(sessions.map(s => s.day))];
-    renderFilterBar(days);
-
-    const filtered = activeDay
-      ? sessions.filter(s => s.day === activeDay)
-      : sessions;
-
-    if (!filtered.length) {
-      sessionsList.innerHTML = '<p class="empty-message">Nenhuma sessão disponível.</p>';
-      return;
+  for (let i = 1; i < regData.length; i++) {
+    const sessionId = regData[i][1];
+    if (sessionId) {
+      counts[sessionId] = (counts[sessionId] || 0) + 1;
     }
+  }
 
-    // Group by day to show day headings
-    const byDay = {};
-    filtered.forEach(s => { (byDay[s.day] = byDay[s.day] || []).push(s); });
+  const sessData = sessSheet.getDataRange().getValues();
+  const availability = {};
 
-    Object.entries(byDay).forEach(([day, daySessions]) => {
-      const heading = document.createElement('h2');
-      heading.className = 'day-heading';
-      heading.textContent = day;
-      sessionsList.appendChild(heading);
+  for (let i = 1; i < sessData.length; i++) {
+    const sessionId = sessData[i][0];
+    const capacity = Number(sessData[i][5]) || 10;
+    const registered = counts[sessionId] || 0;
+    availability[sessionId] = Math.max(0, capacity - registered);
+  }
 
-      const row = document.createElement('div');
-      row.className = 'sessions-row';
+  return availability;
+}
 
-      daySessions.forEach(session => {
-        const topic = topicById(session.topicId);
-        if (!topic) return;
-        const spots = (availability[session.id] != null) ? availability[session.id] : session.spots;
-        row.appendChild(createSessionCard(session, topic, spots));
-      });
+function getSessionsFromSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sessSheet = ss.getSheetByName(SHEET_SESSIONS);
 
-      sessionsList.appendChild(row);
+  if (!sessSheet) throw new Error('Aba Sessões não encontrada.');
+
+  const data = sessSheet.getDataRange().getValues();
+  const sessions = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+
+    sessions.push({
+      id: row[0],
+      topicId: row[1],
+      time: row[2],
+      day: row[3],
+      name: row[4],
+      spots: Number(row[5]) || 10,
     });
   }
 
-  // ─── Open registration form ───────────────────────────────────
-  function openForm(session, topic, spots) {
-    selectedSession = session;
+  return sessions;
+}
 
-    formTopicEmoji.textContent  = topic.emoji;
-    formTopicName.textContent   = topic.name;
-    formSessionMeta.textContent =
-      `${session.time} · ${session.day} · ${CONFIG.event.location}`;
+function getSessionDetails(sessionId) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sessSheet = ss.getSheetByName(SHEET_SESSIONS);
+  if (!sessSheet) throw new Error('Aba Sessões não encontrada.');
 
-    registrationForm.reset();
-    hideFormError();
-    setSubmitLoading(false);
-
-    showView('form');
-  }
-
-  // ─── Registration submit ──────────────────────────────────────
-  async function handleSubmit(evt) {
-    evt.preventDefault();
-    hideFormError();
-
-    const data        = new FormData(registrationForm);
-    const name        = (data.get('name')        || '').trim();
-    const institution = (data.get('institution') || '').trim();
-    const email       = (data.get('email')       || '').trim();
-    const interests   = data.getAll('interests');
-
-    if (!name || !email) {
-      showFormError('Por favor, preencha nome e email.');
-      return;
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      showFormError('Por favor, insira um email válido.');
-      return;
-    }
-
-    setSubmitLoading(true);
-
-    if (DEMO) {
-      await new Promise(r => setTimeout(r, DEMO_SUBMIT_DELAY_MS));
-      setSubmitLoading(false);
-      showConfirmation(selectedSession, topicById(selectedSession.topicId));
-      return;
-    }
-
-    try {
-      const payload = {
-        action: 'register',
-        sessionId: selectedSession.id,
-        name,
-        institution,
-        email,
-        interests,
+  const data = sessSheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[0] === sessionId) {
+      return {
+        id: row[0],
+        topicId: row[1],
+        time: row[2],
+        day: row[3],
+        topicName: row[4],
+        spots: Number(row[5]) || 10,
       };
-
-      const res  = await fetch(CONFIG.APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-
-      if (json.success) {
-        showConfirmation(selectedSession, topicById(selectedSession.topicId));
-      } else {
-        setSubmitLoading(false);
-        showFormError(json.error || 'Erro ao realizar inscrição. Tente novamente.');
-      }
-    } catch (err) {
-      setSubmitLoading(false);
-      showFormError('Erro de conexão. Verifique sua internet e tente novamente.');
     }
   }
 
-  // ─── Confirmation ─────────────────────────────────────────────
-  function showConfirmation(session, topic) {
-    confTopic.textContent    = topic ? topic.name : '';
-    confTime.textContent     = session.time;
-    confDay.textContent      = session.day;
-    confLocation.textContent = CONFIG.event.locationDetail;
-    showView('confirmation');
+  return null;
+}
+
+function registerVisitor(payload) {
+  const { sessionId, name, institution, email, interests } = payload;
+
+  if (!sessionId || !name || !email) {
+    return {
+      success: false,
+      error: 'Campos obrigatórios ausentes (sessionId, name, email).',
+    };
   }
 
-  // ─── Fetch availability ────────────────────────────────────────
-  async function fetchAvailability() {
-    if (DEMO) {
-      availability = buildDemoAvailability();
-      return;
-    }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { success: false, error: 'Endereço de email inválido.' };
+  }
 
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const regSheet = ss.getSheetByName(SHEET_REGISTRATIONS);
+  if (!regSheet) {
+    return { success: false, error: 'Aba de inscrições não encontrada.' };
+  }
+
+  const availability = getAvailability();
+
+  if (!(sessionId in availability)) {
+    return { success: false, error: 'Sessão não encontrada.' };
+  }
+
+  if (availability[sessionId] <= 0) {
+    return {
+      success: false,
+      error: 'Desculpe, não há mais vagas disponíveis nesta sessão.',
+    };
+  }
+
+  const regData = regSheet.getDataRange().getValues();
+  for (let i = 1; i < regData.length; i++) {
+    if (
+      String(regData[i][2]).toLowerCase() === String(email).toLowerCase() &&
+      regData[i][1] === sessionId
+    ) {
+      return {
+        success: false,
+        error: 'Este email já está inscrito nesta sessão.',
+      };
+    }
+  }
+
+  const timestamp = new Date().toISOString();
+  const interestsStr = Array.isArray(interests)
+    ? interests.join(', ')
+    : String(interests || '');
+
+  regSheet.appendRow([
+    timestamp,
+    sessionId,
+    email,
+    name,
+    institution || '',
+    interestsStr,
+  ]);
+
+  const sessionInfo = getSessionDetails(sessionId);
+  Logger.log('sessionId recebido: ' + sessionId);
+  Logger.log('email recebido: ' + email);
+  Logger.log('name recebido: ' + name);
+  Logger.log('sessionInfo encontrado: ' + JSON.stringify(sessionInfo));
+
+  if (sessionInfo) {
     try {
-      const res  = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=availability`);
-      const json = await res.json();
-      if (json.success && json.availability) {
-        availability = json.availability;
-      }
+      Logger.log('Tentando enviar email para: ' + email);
+      Logger.log('Quota restante: ' + MailApp.getRemainingDailyQuota());
+      sendConfirmationEmail(email, name, sessionInfo);
+      Logger.log('Email enviado com sucesso para: ' + email);
     } catch (err) {
-      // Non-fatal: fall back to configured spot totals
-      console.warn('Failed to fetch availability:', err);
-      availability = {};
-      CONFIG.sessions.forEach(s => { availability[s.id] = s.spots; });
+      Logger.log('Erro ao enviar email de confirmação: ' + err.message);
     }
+  } else {
+    Logger.log('Nenhuma sessão encontrada para sessionId: ' + sessionId);
   }
 
-  // ─── URL params ────────────────────────────────────────────────
-  // Returns true if the form was opened directly (suppress default session render).
-  function applyUrlParams() {
-    const params   = new URLSearchParams(window.location.search);
-    const sessaoId = params.get('sessao');
-    const temaId   = params.get('tema');
+  Logger.log('Inscrição registrada: ' + email + ' → ' + sessionId);
+  return { success: true, message: 'Inscrição realizada com sucesso!', emailVersion: 'v2-email-on' };;
+}
 
-    if (sessaoId) {
-      const session = CONFIG.sessions.find(s => s.id === sessaoId);
-      if (session) {
-        const topic = topicById(session.topicId);
-        const spots = (availability[session.id] != null) ? availability[session.id] : session.spots;
-        if (topic && spots > 0) {
-          openForm(session, topic, spots);
-          return true;
-        }
-      }
-    }
+// ─────────────────────────────────────────────────────────────
+// EMAIL
+// ─────────────────────────────────────────────────────────────
 
-    if (temaId) {
-      // Pre-filter the list to sessions with the matching topicId
-      const matchingDay = (CONFIG.sessions.find(s => s.topicId === temaId) || {}).day;
-      activeDay = matchingDay || null;
-    }
-
-    return false;
+function sendConfirmationEmail(email, name, sessionInfo) {
+  if (!sessionInfo) {
+    throw new Error('sessionInfo não foi informado para sendConfirmationEmail.');
   }
 
-  // ─── Init ─────────────────────────────────────────────────────
-  async function init() {
-    if (DEMO) demoBanner.hidden = false;
-
-    // Loading spinner is visible in HTML by default; hide sessions list while loading
-    sessionsLoading.hidden = false;
-    sessionsList.hidden    = true;
-
-    await fetchAvailability();
-
-    sessionsLoading.hidden = true;
-    sessionsList.hidden    = false;
-
-    const openedForm = applyUrlParams();
-    if (!openedForm) {
-      renderSessions();
-    }
+  let formattedTime = sessionInfo.time || '';
+  if (formattedTime instanceof Date) {
+    formattedTime = Utilities.formatDate(
+      formattedTime,
+      Session.getScriptTimeZone(),
+      'HH:mm'
+    );
   }
 
-  // ─── Event listeners ──────────────────────────────────────────
-  registrationForm.addEventListener('submit', handleSubmit);
+  const subject = 'Confirmação de inscrição — Space Weather Talks';
 
-  btnBackHome.addEventListener('click', () => {
-    selectedSession = null;
-    showView('home');
-    renderSessions();
+  const body = [
+    `Olá, ${name}!`,
+    '',
+    'Sua inscrição foi confirmada.',
+    '',
+    `Tema: ${sessionInfo.topicName || ''}`,
+    `Horário: ${formattedTime}`,
+    `Dia: ${sessionInfo.day || ''}`,
+    'Local: Espaço do EMBRACE - INPE no estande da AEB',
+    '',
+    'Se necessário, chegue com alguns minutos de antecedência.',
+    '',
+    'Nos vemos em breve!',
+    '',
+    'EMBRACE - INPE',
+    'SpaceBR Show 2026',
+  ].join('\n');
+
+  MailApp.sendEmail(email, subject, body);
+}
+
+function testSendEmail() {
+  MailApp.sendEmail(
+    'email',
+    'Teste — Space Weather Talks',
+    'Se você recebeu este email, o envio está funcionando.'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// UTILITÁRIOS
+// ─────────────────────────────────────────────────────────────
+
+function jsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ─────────────────────────────────────────────────────────────
+// SETUP INICIAL DA PLANILHA
+// ─────────────────────────────────────────────────────────────
+
+function setupSpreadsheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  let sessSheet = ss.getSheetByName(SHEET_SESSIONS);
+  if (!sessSheet) sessSheet = ss.insertSheet(SHEET_SESSIONS);
+  sessSheet.clearContents();
+
+  const sessHeaders = ['ID', 'Tema ID', 'Horário', 'Dia', 'Nome do Tema', 'Vagas'];
+  sessSheet.getRange(1, 1, 1, sessHeaders.length)
+    .setValues([sessHeaders])
+    .setFontWeight('bold');
+
+  const sessions = [
+    [
+      'session-1',
+      'lancamentos-foguetes',
+      '10:30',
+      '16/06',
+      'Monitoramento de clima espacial durante lançamentos de foguetes',
+      15
+    ],
+    [
+      'session-2',
+      'aviacao-eventos-extremos',
+      '14:30',
+      '16/06',
+      'Os perigos causados à aviação durante eventos extremos de clima espacial',
+      15
+    ],
+    [
+      'session-3',
+      'gics-rede-eletrica',
+      '10:30',
+      '17/06',
+      'Quando o Sol ameaça a rede elétrica: entendendo as Correntes Geomagneticamente Induzidas (GICs)',
+      15
+    ],
+    [
+      'session-4',
+      'gps-drones-agricultura',
+      '14:30',
+      '17/06',
+      'Do espaço para o campo: como o clima espacial afeta GPS, drones e agricultura de precisão',
+      15
+    ],
+  ];
+
+  sessSheet.getRange(2, 1, sessions.length, 6).setValues(sessions);
+
+  let regSheet = ss.getSheetByName(SHEET_REGISTRATIONS);
+  if (!regSheet) regSheet = ss.insertSheet(SHEET_REGISTRATIONS);
+  regSheet.clearContents();
+
+  const regHeaders = ['Timestamp', 'Session ID', 'Email', 'Nome', 'Instituição', 'Interesses'];
+  regSheet.getRange(1, 1, 1, regHeaders.length)
+    .setValues([regHeaders])
+    .setFontWeight('bold');
+
+  Logger.log('✅ Planilha configurada com sucesso! As abas "Sessões" e "Inscrições" foram criadas.');
+}
+
+function testSessionLookup() {
+  const sessionInfo = getSessionDetails('session-1');
+  Logger.log(JSON.stringify(sessionInfo));
+}
+
+function testRegisterMock() {
+  const result = registerVisitor({
+    action: 'register',
+    sessionId: 'session-1',
+    name: 'Teste Email',
+    institution: 'INPE',
+    email: 'jpmarchezi+teste2@gmail.com',
+    interests: ['Cursos e treinamentos']
   });
 
-  btnNewReg.addEventListener('click', () => {
-    selectedSession = null;
-    showView('home');
-    renderSessions();
-  });
-
-  btnRetry.addEventListener('click', () => {
-    selectedSession = null;
-    showView('home');
-    renderSessions();
-  });
-
-  // ─── Boot ─────────────────────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', init);
-
-})();
+  Logger.log(JSON.stringify(result));
+}
